@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("java")
     id("maven-publish")
@@ -7,8 +9,12 @@ plugins {
     id("org.openjfx.javafxplugin") version "0.1.0"
 }
 
+val props = Properties()
+file("gradle.properties").inputStream().use { props.load(it) }
+
+
 group = "megalodonte"
-version = "1.0.0"
+version = props.getProperty("appVersion")
 
 repositories {
     mavenCentral()
@@ -45,19 +51,6 @@ dependencies {
     implementation("megalodonte:megalodonte-router:1.0.0-beta")
     implementation("megalodonte:megalodonte-theme:1.0.0-beta")
     implementation("megalodonte:megalodonte-async:1.0.0-beta")
-
-
-    implementation("org.kordamp.ikonli:ikonli-core:12.4.0")
-    implementation("org.kordamp.ikonli:ikonli-javafx:12.4.0")
-    implementation("org.kordamp.ikonli:ikonli-antdesignicons-pack:12.4.0")
-    implementation("org.kordamp.ikonli:ikonli-entypo-pack:12.4.0")
-
-    //sqlite
-    implementation("org.xerial:sqlite-jdbc:3.45.1.0")
-
-    //implementation("megalodonte:megalodonte-previewer-components:1.0.0")
-
-    // Dependências JavaFX removidas (agora gerenciadas pelo bloco 'javafx { ... }')
 }
 
 tasks.test {
@@ -65,16 +58,16 @@ tasks.test {
 }
 
 application {
-    mainClass.set("my_app.Main")
+    mainClass.set(props.getProperty("appMainClass"))
 }
 
 tasks.jar {
     enabled = true
-    archiveBaseName.set("adb-file-pusher")
+    archiveBaseName.set(props.getProperty("appName"))
 
     manifest {
         attributes(
-            "Implementation-Title" to "JavaFX adb-file-pusher app",
+            "Implementation-Title" to "JavaFX ${props.getProperty("appName")} app",
             "Implementation-Version" to project.version
         )
     }
@@ -90,13 +83,10 @@ val copyDeps = tasks.register<Copy>("copyDependencies") {
     exclude("org/openjfx/**")
 }
 
-tasks.register<Exec>("createInstaller") {
+tasks.register<Exec>("createInstallerLinux") {
     group = "distribution"
     description = "Gera o instalador .deb usando o script shell."
 
-    // Garante que o JAR seja buildado antes de rodar o script
-//    dependsOn("jar")
-   // dependsOn("shadowJar")
     dependsOn("jar", "copyDependencies")
 
     // Define o diretório de execução como a raiz do projeto
@@ -106,12 +96,47 @@ tasks.register<Exec>("createInstaller") {
     commandLine("./scripts/linux/create-installer-using-gradlew.sh")
 }
 
+tasks.register<Exec>("createInstallerLinuxOptimized") {
+    group = "distribution"
+    description = "Gera o instalador .deb otimizado usando o script shell."
+
+    dependsOn("jar", "copyDependencies")
+
+    workingDir = projectDir
+
+    commandLine("./scripts/linux/create-installer-using-gradlew-optimized.sh")
+}
+
+tasks.register<Exec>("createInstallerWindows") {
+    group = "distribution"
+    description = "Gera o instalador .msi usando o script PowerShell."
+
+    dependsOn("jar", "copyDependencies")
+
+    // Define o diretório de execução como a raiz do projeto
+    workingDir = projectDir
+
+    // Comando para rodar o script
+    commandLine("pwsh", "./scripts/windows/create-installer-using-gradlew.ps1")
+}
+
+tasks.register<Exec>("createFastExeWindows") {
+    group = "distribution"
+    description = "Gera o executável .exe rápido usando o script PowerShell."
+
+    dependsOn("jar", "copyDependencies")
+
+    workingDir = projectDir
+
+    commandLine("pwsh", "./scripts/windows/create-fast-exe-using-gradlew.ps1")
+}
+
 // Configuração de Publicação (mantida)
 publishing {
     publications {
         create<MavenPublication>("mavenJava") {
             from(components["java"])
-            artifactId = "adb-file-pusher"
+            artifactId = props.getProperty("appName")
         }
     }
 }
